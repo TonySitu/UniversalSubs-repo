@@ -1,0 +1,45 @@
+# Builds the PATCHED ProcTap wheel (removes the wrong Win10 build gate) for
+# every supported Python version, so users on any Python 3.9–3.13 get working
+# per-app capture — not just 3.11.
+#
+# Trigger it manually from the Actions tab (workflow_dispatch), or automatically
+# when you push a tag like proctap-v1.0.3+us.1. Wheels are uploaded as build
+# artifacts and (on a tag) attached to a GitHub Release.
+
+name: Build patched ProcTap wheels
+
+on:
+  workflow_dispatch:        # run on demand from the Actions tab
+  push:
+    tags:
+      - 'proctap-*'         # or auto-run when you push a proctap-* tag
+
+jobs:
+  build-wheels:
+    name: Build ProcTap wheels (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Check out this repo (for the patched ProcTap source)
+        uses: actions/checkout@v4
+
+      - name: Build wheels with cibuildwheel
+        uses: pypa/cibuildwheel@v3.4
+        with:
+          package-dir: proctap-src      # the patched ProcTap source lives here
+          output-dir: wheelhouse
+        env:
+          # One wheel per CPython 3.9–3.13, 64-bit Windows only.
+          CIBW_BUILD: "cp39-win_amd64 cp310-win_amd64 cp311-win_amd64 cp312-win_amd64 cp313-win_amd64"
+          CIBW_BUILD_VERBOSITY: "1"
+
+      - name: Upload wheels as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: proctap-wheels
+          path: wheelhouse/*.whl
+
+      - name: Attach wheels to a GitHub Release (only on a proctap-* tag)
+        if: startsWith(github.ref, 'refs/tags/proctap-')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wheelhouse/*.whl
