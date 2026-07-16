@@ -72,7 +72,7 @@ APP_NAME = "UniversalSubs"
 try:
     from universalsubs import __version__ as APP_VERSION
 except ImportError:      # running app.py as a loose script
-    APP_VERSION = "0.9.2"
+    APP_VERSION = "0.9.6"
 def _config_dir():
     base = os.environ.get("APPDATA") or os.path.expanduser("~")
     d = os.path.join(base, "UniversalSubs")
@@ -616,8 +616,6 @@ class DeepgramStreamer:
             # fallback: endpointing missed the pause, force-finalize what we have
             full = " ".join(self.finals).strip()
             if full:
-                print(f"[dbg] UtteranceEnd-fallback utt={self.utt_id} "
-                      f"segs={len(self.finals)} text={full[:40]!r}")
                 self.on_update(self.utt_id, full, True, self.cur_speaker)
                 self.finals = []
                 self.utt_id += 1
@@ -662,8 +660,6 @@ class DeepgramStreamer:
             if speech_final:
                 full = " ".join(self.finals).strip()
                 if full:
-                    print(f"[dbg] speech_final utt={self.utt_id} "
-                          f"segs={len(self.finals)} text={full[:40]!r}")
                     self.on_update(self.utt_id, full, True, self.cur_speaker)
                 self.finals = []
                 self.utt_id += 1
@@ -863,11 +859,12 @@ PROC_SR = 48000   # ProcTap Windows backend: 48 kHz stereo float32
 
 DEFAULT_DEVICE_LABEL = "(Default speakers)"
 
-# WASAPI process loopback requires Windows build 20348+ (Win11 / Server 2022).
-# On older builds (e.g. Win10 22H2 = 19045) the native layer does NOT error —
-# it silently captures ALL system audio, violating the user's app selection.
-# Verified empirically on 19045. So the feature is version-gated hard.
-MIN_BUILD_PROCESS_LOOPBACK = 20348
+# WASAPI process loopback (ActivateAudioInterfaceAsync with
+# AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK) is available on Windows 10
+# 2004 (build 19041) and later — the same floor OBS uses. Verified working on
+# 19045 with the patched proctap wheel (the stock 1.0.3 wheel had a wrong
+# build gate that silently fell back to system-wide capture).
+MIN_BUILD_PROCESS_LOOPBACK = 19041
 
 def win_build():
     try:
@@ -1420,11 +1417,13 @@ class App:
         root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # -- UI -----------------------------------------------------------
-    def _row(self, label):
+    def _row(self, label, pack=True):
         f = tk.Frame(self.root, bg=BG)
-        f.pack(fill="x", padx=16, pady=(10, 0))
+        if pack:
+            f.pack(fill="x", padx=16, pady=(10, 0))
         tk.Label(f, text=label, bg=BG, fg=TEXT_MUTED,
                  font=("Segoe UI", 10)).pack(anchor="w")
+        f._label = label
         return f
 
     def _key_entry(self, parent, var):
@@ -1481,15 +1480,17 @@ class App:
         f = self._row("Audio source")
         tk.Radiobutton(f, text="All system audio", variable=self.source_mode,
                        value="system", bg=BG, fg=TEXT, selectcolor=SURFACE2,
-                       activebackground=BG, font=("Segoe UI", 10)).pack(side="left")
+                       activebackground=BG, font=("Segoe UI", 10),
+                       command=self._on_source_mode).pack(side="left")
         apps_label = ("Selected apps only" if process_loopback_supported()
-                      else "Selected apps only (needs Win11)")
+                      else "Selected apps only (needs Win10 2004+)")
         tk.Radiobutton(f, text=apps_label, variable=self.source_mode,
                        value="apps", bg=BG, fg=TEXT, selectcolor=SURFACE2,
                        activebackground=BG, font=("Segoe UI", 10),
-                       command=self._apps_mode_blocked).pack(side="left", padx=(10, 0))
-        tk.Button(f, text="Choose apps…", bg=SURFACE2, fg=TEXT_MUTED, relief="flat",
-                  bd=0, padx=8, command=self._choose_apps).pack(side="left", padx=(10, 0))
+                       command=self._on_source_mode).pack(side="left", padx=(10, 0))
+        self.choose_btn = tk.Button(f, text="Choose apps…", bg=SURFACE2,
+                  fg=TEXT_MUTED, relief="flat", bd=0, padx=8, command=self._choose_apps)
+        self.choose_btn.pack(side="left", padx=(10, 0))
         tk.Checkbutton(f, text="Music guard", variable=self.music_guard,
                        bg=BG, fg=TEXT, selectcolor=SURFACE2, activebackground=BG,
                        font=("Segoe UI", 10)).pack(side="left", padx=(10, 0))
@@ -1497,22 +1498,27 @@ class App:
                                  fg=TEXT_MUTED, font=("Segoe UI", 9))
         self.apps_lbl.pack(anchor="w", padx=16)
 
-        f = self._row("Capture device — pick 'CABLE Input' here if you route apps "
-                      "through VB-Cable (Win10 per-app setup)")
-        self.dev_combo = ttk.Combobox(f, textvariable=self.capture_dev,
+        # Capture device only matters for "All system audio" (which output to
+        # listen to). Hidden in per-app mode, where it's irrelevant.
+        self.dev_row = self._row("Capture device (which output to listen to; "
+                                 "or a VB-Cable device for routing)", pack=False)
+        self.dev_combo = ttk.Combobox(self.dev_row, textvariable=self.capture_dev,
                                       state="readonly", width=52)
         self.dev_combo["values"] = [DEFAULT_DEVICE_LABEL] + list_loopback_devices()
         self.dev_combo.configure(postcommand=lambda: self.dev_combo.configure(
             values=[DEFAULT_DEVICE_LABEL] + list_loopback_devices()))
         self.dev_combo.pack(side="left")
 
-        f = self._row("Caption style")
-        sm = tk.OptionMenu(f, self.caption_style, *CAPTION_STYLES.keys(),
+        # Caption style row follows; dev_row is inserted BEFORE it when visible
+        self._caption_anchor = self._row("Caption style")
+        sm = tk.OptionMenu(self._caption_anchor, self.caption_style,
+                           *CAPTION_STYLES.keys(),
                            command=lambda _v: self._apply_style())
         sm.configure(bg=SURFACE2, fg=TEXT, relief="flat", highlightthickness=0,
                      activebackground=SURFACE)
         sm["menu"].configure(bg=SURFACE2, fg=TEXT)
         sm.pack(side="left")
+        self._update_source_ui()
 
         f = self._row("Overlay")
         tk.Checkbutton(f, text="Move mode (drag caption)", variable=self.move_mode,
@@ -1552,6 +1558,28 @@ class App:
     def _eff_dg(self):
         return self.dg_key.get().strip() or get_secret("deepgram")
 
+    def _on_source_mode(self):
+        # apps radio may be blocked (old Windows) -> _apps_mode_blocked resets
+        # to system and returns True
+        if self.source_mode.get() == "apps" and self._apps_mode_blocked():
+            pass
+        self._update_source_ui()
+
+    def _update_source_ui(self):
+        apps = self.source_mode.get() == "apps"
+        # show Choose apps + selection label only in apps mode
+        if apps:
+            self.choose_btn.pack(side="left", padx=(10, 0))
+        else:
+            self.choose_btn.pack_forget()
+        # show capture-device row only in system mode, in its proper slot
+        if apps:
+            self.dev_row.pack_forget()
+        else:
+            self.dev_row.pack(fill="x", padx=16, pady=(10, 0),
+                              before=self._caption_anchor)
+        self.apps_lbl.configure(text=self._apps_summary() if apps else "")
+
     def _apps_summary(self):
         if not self.selected_app_names:
             return "No apps selected yet — click Choose apps…"
@@ -1560,14 +1588,15 @@ class App:
     def _apps_mode_blocked(self):
         if process_loopback_supported():
             return False
+        # Below Windows 10 2004 (19041) the process-loopback API doesn't
+        # exist; block honestly and point to the routing fallback.
         messagebox.showwarning(
             "Not available on this Windows",
-            f"Per-app capture needs Windows build {MIN_BUILD_PROCESS_LOOPBACK}+ "
-            f"(Windows 11).\nThis PC is build {win_build()} — on this build "
-            f"Windows silently captures ALL audio instead of just the selected "
-            f"apps, so the feature is disabled to avoid misleading you.\n\n"
-            f"Windows 10 alternative: route apps with VB-Cable and pick the "
-            f"CABLE device under 'Capture device' (see README).")
+            f"Per-app capture needs Windows 10 build "
+            f"{MIN_BUILD_PROCESS_LOOPBACK} (version 2004) or later.\n"
+            f"This PC is build {win_build()}.\n\n"
+            f"Alternative: route apps with VB-Cable and pick the CABLE "
+            f"device under 'Capture device' (see README).")
         self.source_mode.set("system")
         return True
 
@@ -1797,9 +1826,6 @@ class App:
         # (it never displays them), submit just the finished utterance.
         if self._danmaku_active() and not is_end:
             return
-        if is_end:
-            print(f"[dbg] FINAL utt={utt_id} spk={speaker} "
-                  f"text={text_so_far[:40]!r}")
         self.translator.submit(utt_id, text_so_far, is_end, speaker)
 
     # -- chunked path -------------------------------------------------------
