@@ -33,7 +33,7 @@ free Deepgram credit realistically lasts *years* of normal gaming.
 ## What you need
 
 - Windows 10 or 11
-- Python 3.11 (free — exact version matters; setup below has the link)
+- Python 3.9 or newer (free — setup below has the link)
 - Internet connection
 - 10 minutes for first-time setup
 
@@ -41,18 +41,15 @@ free Deepgram credit realistically lasts *years* of normal gaming.
 
 ## First-time setup
 
-**Step 1 — Install Python 3.11** (skip if you already have 3.11)
-**Use this exact version — Python 3.11.** The per-app capture component ships
-as a prebuilt file that only works with 3.11; newer versions (3.12, 3.13,
-3.14) will fail to install it.
+**Step 1 — Install Python** (skip if you already have Python 3.9+)
+Any Python **3.9 or newer** works. If you don't have it:
+https://www.python.org/downloads/ → download the latest Windows installer →
+run it → **IMPORTANT: tick the "Add Python to PATH" checkbox** before
+clicking Install.
 
-Direct download (Windows 64-bit):
-https://www.python.org/downloads/release/python-3119/
-→ scroll to "Files" → **"Windows installer (64-bit)"** → run it →
-**IMPORTANT: tick the "Add Python to PATH" checkbox** before clicking Install.
-
-(Already have a newer Python? Keep it — just install 3.11 alongside it and
-launch with `py -3.11 -m universalsubs`.)
+(Per-app capture ships as prebuilt files for Python 3.9–3.13. On Python 3.14
+everything works except the native app-picker — use "All system audio" or
+the routing option instead, until a 3.14 build is added.)
 
 **Step 2 — Get your two free AI keys**
 A "key" is a long code that proves the AI service is talking to *your*
