@@ -23,13 +23,17 @@ if errorlevel 1 ( echo [ERROR] Install failed - see above. & pause & exit /b 1 )
 :proctap_step
 python -c "import proctap" 2>nul
 if not errorlevel 1 ( echo [2/3] Per-app capture already installed. & goto :launch )
-echo [2/3] OPTIONAL per-app capture (Windows 11)...
+echo [2/3] OPTIONAL per-app capture (native app picker)...
+echo       Everything works without it via "All system audio".
+REM Prefer a bundled wheel matching THIS Python (any version we shipped).
 if exist wheels\ (
-    python -m pip install --no-index --find-links wheels proc-tap --quiet 2>nul
+    python -m pip install --find-links wheels proc-tap --quiet 2>nul
 )
 python -c "import proctap" 2>nul
 if not errorlevel 1 ( echo   Per-app capture OK ^(bundled wheel^). & goto :launch )
-echo   (skipped - app works with "All system audio")
+echo   No matching prebuilt wheel for your Python; app runs without the
+echo   native app-picker. ^(Windows 10 2004+/11 users: install Python 3.11
+echo   for the bundled wheel, or see BUILD_WHEEL_ONCE.md to build your own.^)
 
 :launch
 echo [3/3] Launching UniversalSubs...
