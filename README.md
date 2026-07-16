@@ -119,29 +119,31 @@ By default the tool hears **everything** your computer plays. Usually fine —
 but for control (subtitle **Discord + your game**, never listen to
 **Spotify**):
 
-### Windows 11 — built in, easiest
-Pick **"Selected apps only"** → **"Choose apps…"** → tick the apps you want.
+**Works natively on Windows 10 (version 2004+) and Windows 11** — no extra
+software:
+
+Pick **"Selected apps only"** → **"Choose apps…"** → tick the apps you want
+(e.g. Discord + your game). Everything unticked — including Spotify — is
+completely ignored; its audio never even reaches the tool.
 (An app appears in the list only if it's open and has made a sound — play
 one second of audio and reopen the list if it's missing.)
 
-### Windows 10 — needs one extra step
-Windows 10 can't hand one app's audio to a program directly, so use this
-trick: **split your apps across two "outputs" and only listen to one.**
-Two rooms — the tool's microphone is only in Room A; anything sent to
-Room B can't be heard.
+### Older Windows 10 (before version 2004) — routing fallback
+If per-app capture isn't available on your build, isolate apps by
+**splitting them across two audio outputs and listening to only one** — the
+tool's "microphone" sits in Room A, so anything sent to Room B is unheard.
 
-**Option 1 — you already own two audio outputs (no installs).**
+**Option A — a second output you already own (no installs).**
 Headphones + monitor speakers = two rooms. Best for excluding one app:
-1. Windows Settings → System → Sound → **App volume and device preferences**
+1. Settings → System → Sound → **App volume and device preferences**
 2. Set Spotify's **Output** to the monitor speakers (volume zero if you
    don't want to hear it there)
 3. Leave **Capture device** in the app on "(Default speakers)"
 
-**Option 2 — VB-Cable (free, best for "ONLY these apps").**
-VB-Cable adds an extra *virtual* output — a Room B in software. Tiny (1 MB),
-trusted by streamers for a decade. **Music apps are the #1 thing you'll
-want to route away** — music defeats every automatic filter, so keeping it
-out of the captured room entirely is the real fix.
+**Option B — VB-Cable (free virtual output, best for "ONLY these apps").**
+A tiny (1 MB), long-trusted streamer tool that adds a software-only output.
+**Music apps are the #1 thing to route away** — music defeats every
+automatic filter, so keeping it out of the captured room is the real fix.
 1. https://vb-audio.com/Cable → install → restart once
 2. Settings → Sound → **App volume and device preferences** → set
    **Discord** and **your game** to output to **"CABLE Input"**; leave
@@ -187,5 +189,5 @@ passwords) — never in a plain file, never shown on screen after saving.
 
 ---
 
-*Developers: see `BUILD_WHEEL_ONCE.md` (building the Windows 11 per-app
-capture wheel) and `TESTING.md` (release checklist).*
+*Developers: see `BUILD_WHEEL_ONCE.md` (building the per-app capture wheel)
+and `TESTING.md` (release checklist).*
